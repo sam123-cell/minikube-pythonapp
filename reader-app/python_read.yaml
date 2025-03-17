@@ -1,0 +1,72 @@
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: app-reader
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: app-reader
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+  template:
+    metadata:
+      labels:
+        app: app-reader
+    spec:
+      containers:
+        - name: mysql-reader
+          image: mysql-reader:latest
+          imagePullPolicy: Never
+          command: ["python", "-u", "mysql_reader.py"]
+          ports:
+            - containerPort: 5000
+          env:
+            - name: MYSQL_HOST
+              valueFrom:
+                secretKeyRef:
+                  name: app-secret
+                  key: MYSQL_HOST
+            - name: MYSQL_USER
+              valueFrom:
+                secretKeyRef:
+                  name: app-secret
+                  key: MYSQL_USER
+            - name: MYSQL_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: app-secret
+                  key: MYSQL_PASSWORD
+            - name: MYSQL_DATABASE
+              valueFrom:
+                secretKeyRef:
+                  name: app-secret
+                  key: MYSQL_DATABASE
+          resources:
+            limits:
+              memory: "250Mi"
+              cpu: "500m"
+          readinessProbe:
+            httpGet:
+              path: /health  # Use a real health check endpoint
+              port: 5000
+            initialDelaySeconds: 10  # Wait before checking
+            periodSeconds: 3
+      restartPolicy: Always
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: mysql-reader-service
+spec:
+  selector:
+    app: app-reader
+  ports:
+    - protocol: TCP
+      port: 5000
+      targetPort: 5000
+  type: LoadBalancer

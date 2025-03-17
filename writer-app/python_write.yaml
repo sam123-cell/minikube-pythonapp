@@ -1,0 +1,72 @@
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: app-secret
+type: Opaque
+data:
+  MYSQL_HOST: bXktY2x1c3Rlci1teXNxbC1tYXN0ZXI=
+  MYSQL_USER: cm9vdA==   # Base64 encoded 'root'
+  MYSQL_PASSWORD: bXlwYXNz   # Base64 encoded 'password'
+  MYSQL_DATABASE: dGVzdF9kYg==
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mysql-writer
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: app-writer
+  template:
+    metadata:
+      labels:
+        app: app-writer
+    spec:
+      containers:
+        - name: mysql-writer
+          image: mysql-writer:2.0
+          imagePullPolicy: Never
+          command: ["python", "-u", "mysql_writer.py"]
+          ports:
+            - containerPort: 6000
+          env:
+            - name: MYSQL_HOST
+              valueFrom:
+                secretKeyRef:
+                  name: app-secret
+                  key: MYSQL_HOST
+            - name: MYSQL_USER
+              valueFrom:
+                secretKeyRef:
+                  name: app-secret
+                  key: MYSQL_USER
+            - name: MYSQL_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: app-secret
+                  key: MYSQL_PASSWORD
+            - name: MYSQL_DATABASE
+              valueFrom:
+                secretKeyRef:
+                  name: app-secret
+                  key: MYSQL_DATABASE
+          resources:
+            limits:
+              memory: "250Mi"
+              cpu: "500m"
+      restartPolicy: Always
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: mysql-writer-service
+spec:
+  selector:
+    app: app-writer
+  ports:
+    - protocol: TCP
+      port: 80
+      targetPort: 6000
+  type: LoadBalancer
